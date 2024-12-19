@@ -28,9 +28,9 @@ public:
         return age > lifetime;
     }
 
-    void draw() const {                     //Rysuje cząstkę jako kulę o promieniu 2
+    void draw() const {                     //Rysuje cząstkę jako kulę o promieniu 3
         ofSetColor(color);
-        ofDrawSphere(position, 1.0);
+        ofDrawSphere(position, 3.0);
     }
 };
 
@@ -72,33 +72,60 @@ public:
 // Klasa ParticleSystem - Reprezentuje cały system cząsteczek
 class ParticleSystem {
 public:
-    std::vector<Particle> particles;
-    Emitter emitter;
+    std::vector<Particle> particles;            //Vektor przechowujący wszystkie cząsteczki
+    Emitter emitter;                            //Emiter generujący nowe cząsteczki
 
-    ParticleSystem(const Emitter& em) : emitter(em) {}
+    ofVec3f spherePosition;                     // Położenie i promień kuli
+    float sphereRadius;
 
-    void applyForce(const ofVec3f& force) {
+    // Konstruktor uwzględniający emiter i kulę 
+    ParticleSystem(const Emitter& em)
+        : emitter(em), spherePosition(ofVec3f(0, 0, 0)), sphereRadius(100.0f) {}
+
+    void applyForce(const ofVec3f& force) {     //Funkcja dodajaca siłe do cząsteczek
         for (auto& p : particles) {
             p.applyForce(force);
         }
     }
 
     void update(float dt) {
-        auto newParticles = emitter.emit(dt);
-        particles.insert(particles.end(), newParticles.begin(), newParticles.end());
+        auto newParticles = emitter.emit(dt);               //Wywołuje metodę emit emitera, aby wygenerować nowe cząstki 
+        particles.insert(particles.end(), newParticles.begin(), newParticles.end());    //Dodaje nowo wygenerowane cząstki do istniejącego zbioru cząstek
         for (auto& p : particles) {
-            p.update(dt);
+            p.update(dt);           //Aktualizacja pozycji cząsteczek
+            handleCollision(p);     // Obsługa kolizji z kulą
         }
-        particles.erase(
-            std::remove_if(particles.begin(), particles.end(),
-                           [](const Particle& p) { return p.isDead(); }),
-            particles.end()
-        );
+        for (auto it = particles.begin(); it != particles.end();) {
+            if (it->isDead()) {
+                it = particles.erase(it); // Usuwa cząstkę i aktualizuje iterator
+            } else {
+                    ++it; // Przechodzi do następnej cząstki
+            }
+        }
     }
 
     void draw() const {
-        for (const auto& p : particles) {
+        ofSetColor(100, 100, 255);
+        ofDrawSphere(spherePosition, sphereRadius);         // Rysowanie kuli
+
+        for (const auto& p : particles) {                   //Rysowanie cząsteczek
             p.draw();
+        }
+
+
+    }
+
+private:
+    void handleCollision(Particle& p) {
+        ofVec3f toParticle = p.position - spherePosition;               //Oblicza wektor od środka kuli (spherePosition) do pozycji cząstki (p.position)
+
+        if (toParticle.length() <= sphereRadius) {                      //Sprawdza, czy cząstka znajduje się wewnątrz lub na powierzchni kuli, mierząc długość wektora toParticle
+            toParticle.normalize();                                     //Normalizacja wektora - zmienia jego długość na 1, ale zachowuje kierunek
+                                                                                // Odbicie cząstki od powierzchni kuli
+            p.velocity -= 2 * (p.velocity.dot(toParticle)) * toParticle;        //dot - Iloczyn skalarny
+
+            // Przesunięcie cząstki na zewnątrz kuli
+            //p.position = spherePosition + toParticle * sphereRadius;
         }
     }
 };
